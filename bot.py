@@ -715,10 +715,15 @@ def register_bot_handlers(bot: TelegramClient):
             msg = await event.respond("⏳ **Connecting to Telegram and requesting verification code...**")
             try:
                 res = await user_manager.start_login(user_id, phone)
-                if res == "code_sent":
+                if res == "code_sent" or res.get("status") == "code_sent":
+                    delivery_hint = res.get(
+                        "delivery_hint",
+                        "Check your Telegram app first; Telegram often sends login codes there instead of SMS."
+                    )
                     set_user_state(user_id, "wait_otp", {"phone": phone})
                     await msg.edit(
                         f"✉️ **OTP Code Sent to {phone}!**\n\n"
+                        f"{delivery_hint}\n\n"
                         "Please enter the verification code you received from Telegram.\n"
                         "Note: If the code is `12345`, just send `12345` as a message."
                     )
