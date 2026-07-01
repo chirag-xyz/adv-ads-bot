@@ -1,0 +1,7 @@
+*.db
+*.session
+*.log
+__pycache__/
+.env
+.idea/
+.vscode/
