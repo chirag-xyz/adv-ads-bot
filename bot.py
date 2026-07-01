@@ -2,7 +2,7 @@ import logging
 import asyncio
 import re
 from datetime import datetime
-from telethon import TelegramClient, events, Button
+from telethon import TelegramClient, events, Button, utils
 from telethon.errors import UserNotParticipantError, ChannelPrivateError
 from telethon.tl.functions.channels import GetParticipantRequest
 from telethon.types import ChannelParticipant
@@ -25,6 +25,20 @@ def set_user_state(user_id: int, state: str, data: dict = None):
 def clear_user_state(user_id: int):
     if user_id in _user_states:
         del _user_states[user_id]
+
+def get_original_forward_source(message):
+    """Return the original peer/message id for a forwarded post when Telegram exposes it."""
+    fwd = getattr(message, 'fwd_from', None)
+    if not fwd:
+        return None, None
+
+    source_peer = getattr(fwd, 'from_id', None) or getattr(fwd, 'saved_from_peer', None)
+    source_msg_id = getattr(fwd, 'channel_post', None) or getattr(fwd, 'saved_from_msg_id', None)
+
+    if not source_peer or not source_msg_id:
+        return None, None
+
+    return utils.get_peer_id(source_peer), source_msg_id
 
 # --- Force Join Helper ---
 
@@ -757,8 +771,14 @@ def register_bot_handlers(bot: TelegramClient):
             # Save the message source properties
             # If the user forwarded a message
             if event.fwd_from:
-                data['source_chat_id'] = event.chat_id
-                data['source_msg_id'] = event.id
+                source_chat_id, source_msg_id = get_original_forward_source(event.message)
+                if source_chat_id and source_msg_id:
+                    data['source_chat_id'] = source_chat_id
+                    data['source_msg_id'] = source_msg_id
+                else:
+                    # Telegram can hide the original source for protected/private forwards.
+                    data['source_chat_id'] = event.chat_id
+                    data['source_msg_id'] = event.id
                 data['source_text'] = event.text or ""
             else:
                 data['source_chat_id'] = None
