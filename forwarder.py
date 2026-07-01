@@ -3,7 +3,13 @@ import logging
 from datetime import datetime, timedelta
 from telethon import TelegramClient, helpers
 from telethon.sessions import StringSession
-from telethon.errors import FloodWaitError, PeerIdInvalidError, UserDeactivatedError, AuthKeyUnregisteredError
+from telethon.errors import (
+    AuthKeyDuplicatedError,
+    AuthKeyUnregisteredError,
+    FloodWaitError,
+    PeerIdInvalidError,
+    UserDeactivatedError,
+)
 from telethon.tl.functions.messages import ForwardMessagesRequest, GetForumTopicsRequest
 import database
 import config
@@ -12,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 # In-memory flag to control the background loop
 _running = True
+_account_locks = {}
 
 def stop_forwarder():
     global _running
@@ -69,6 +76,20 @@ async def deliver_message(client: TelegramClient, entity, msg_to_send, source_ch
 
 async def process_task_for_account(task, account, bot_client):
     """Executes forwarding for a single account and a single task."""
+    user_id = task['user_id']
+    task_id = task['task_id']
+    target_types = task['target_types'].split(',')
+    
+    phone = account['phone']
+    session_str = account['session_string']
+    account_id = account['account_id']
+    account_lock = _account_locks.setdefault(account_id, asyncio.Lock())
+
+    async with account_lock:
+        await _process_task_for_account_locked(task, account, bot_client)
+
+async def _process_task_for_account_locked(task, account, bot_client):
+    """Executes forwarding for a single account while its session is exclusively held."""
     user_id = task['user_id']
     task_id = task['task_id']
     target_types = task['target_types'].split(',')
@@ -243,6 +264,13 @@ async def process_task_for_account(task, account, bot_client):
         )
         await bot_client.send_message(user_id, summary_text)
         
+    except AuthKeyDuplicatedError:
+        logger.error(f"Auth key duplicated for account {phone}; marking inactive")
+        await database.set_account_active(account_id, False)
+        await bot_client.send_message(
+            user_id,
+            f"⚠️ **Session Invalidated!**\nAccount **{phone}** was used from two IP addresses/processes at the same time, so Telegram revoked this session. Please stop any other copies of the bot and re-add the account."
+        )
     except AuthKeyUnregisteredError:
         logger.error(f"Auth key unregistered for account {phone}")
         await database.set_account_active(account_id, False)
