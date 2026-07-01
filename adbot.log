@@ -1,0 +1,35 @@
+2026-07-01 15:06:24,422 - __main__ - INFO - Starting Telegram Ad Bot backend...
+2026-07-01 15:06:24,496 - database - INFO - Database initialized successfully.
+2026-07-01 15:06:24,557 - telethon.network.mtprotosender - INFO - Connecting to 149.154.167.51:443/TcpFull...
+2026-07-01 15:06:28,207 - telethon.network.mtprotosender - INFO - Connection to 149.154.167.51:443/TcpFull complete!
+2026-07-01 15:06:31,816 - telethon.client.users - INFO - Phone migrated to 5
+2026-07-01 15:06:31,820 - telethon.client.telegrambaseclient - INFO - Reconnecting to new data center 5
+2026-07-01 15:06:32,445 - telethon.network.mtprotosender - INFO - Disconnecting from 149.154.167.51:443/TcpFull...
+2026-07-01 15:06:32,448 - telethon.network.mtprotosender - INFO - Disconnection from 149.154.167.51:443/TcpFull complete!
+2026-07-01 15:06:32,450 - telethon.network.mtprotosender - INFO - Connecting to 91.108.56.191:443/TcpFull...
+2026-07-01 15:06:36,124 - telethon.network.mtprotosender - INFO - Connection to 91.108.56.191:443/TcpFull complete!
+2026-07-01 15:06:40,346 - __main__ - INFO - Bot client logged in successfully.
+2026-07-01 15:06:40,348 - __main__ - INFO - System is fully active. Press Ctrl+C to terminate.
+2026-07-01 15:06:40,349 - forwarder - INFO - Background forwarder loop started.
+2026-07-01 15:08:32,648 - telethon.network.mtprotosender - INFO - Connecting to 149.154.167.51:443/TcpFull...
+2026-07-01 15:08:35,923 - telethon.network.mtprotosender - INFO - Connection to 149.154.167.51:443/TcpFull complete!
+2026-07-01 15:08:38,240 - user_manager - INFO - OTP code request sent to +79362932634 for user 255448871
+2026-07-01 15:11:23,852 - user_manager - INFO - 2FA password required for account +79362932634 (user 255448871)
+2026-07-01 15:11:32,125 - telethon.network.mtprotosender - INFO - Disconnecting from 149.154.167.51:443/TcpFull...
+2026-07-01 15:11:32,126 - telethon.network.mtprotosender - INFO - Disconnection from 149.154.167.51:443/TcpFull complete!
+2026-07-01 15:11:32,128 - user_manager - INFO - User 255448871 logged in account +79362932634 with 2FA password
+2026-07-01 15:17:10,651 - telethon.network.mtprotosender - INFO - Disconnecting from 91.108.56.191:443/TcpFull...
+2026-07-01 15:17:10,655 - telethon.network.mtprotosender - INFO - Disconnection from 91.108.56.191:443/TcpFull complete!
+2026-07-01 15:17:10,674 - __main__ - INFO - Shutting down services...
+2026-07-01 15:17:10,675 - forwarder - INFO - Forwarder loop cancelled.
+2026-07-01 15:17:10,675 - forwarder - INFO - Background forwarder loop stopped.
+2026-07-01 15:17:10,675 - telethon.network.mtprotosender - INFO - Not disconnecting (already have no connection)
+2026-07-01 15:17:10,690 - __main__ - INFO - Services stopped. Goodbye!
+2026-07-01 15:17:10,697 - __main__ - INFO - Process terminated by user.
+2026-07-01 15:17:15,423 - __main__ - INFO - Starting Telegram Ad Bot backend...
+2026-07-01 15:17:15,425 - database - INFO - Database initialized successfully.
+2026-07-01 15:17:15,433 - telethon.network.mtprotosender - INFO - Connecting to 91.108.56.191:443/TcpFull...
+2026-07-01 15:17:15,763 - telethon.network.mtprotosender - INFO - Connection to 91.108.56.191:443/TcpFull complete!
+2026-07-01 15:17:19,939 - __main__ - INFO - Bot client logged in successfully.
+2026-07-01 15:17:19,939 - __main__ - INFO - System is fully active. Press Ctrl+C to terminate.
+2026-07-01 15:17:19,939 - forwarder - INFO - Background forwarder loop started.

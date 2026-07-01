@@ -1,0 +1,5 @@
+telethon>=1.35.0
+aiosqlite>=0.20.0
+apscheduler>=3.10.4
+cryptography>=42.0.0
+pytz>=2024.1
