@@ -1,10 +1,10 @@
 import asyncio
 import logging
 from datetime import datetime, timedelta
-from telethon import TelegramClient
+from telethon import TelegramClient, helpers
 from telethon.sessions import StringSession
 from telethon.errors import FloodWaitError, PeerIdInvalidError, UserDeactivatedError, AuthKeyUnregisteredError
-from telethon.tl.functions.messages import GetForumTopicsRequest
+from telethon.tl.functions.messages import ForwardMessagesRequest, GetForumTopicsRequest
 import database
 import config
 
@@ -46,6 +46,27 @@ async def get_forum_topics(client: TelegramClient, channel_entity, limit=5):
         logger.debug(f"Failed to fetch forum topics for {channel_entity.id}: {e}")
         return []
 
+async def deliver_message(client: TelegramClient, entity, msg_to_send, source_chat=None, source_msg_id=None, topic_id=None):
+    """Forward source messages when possible; send plain text only as a fallback."""
+    if isinstance(msg_to_send, str):
+        await client.send_message(entity, msg_to_send, reply_to=topic_id)
+        return
+
+    if source_chat and source_msg_id:
+        if topic_id:
+            await client(ForwardMessagesRequest(
+                from_peer=source_chat,
+                id=[source_msg_id],
+                random_id=[helpers.generate_random_long()],
+                to_peer=entity,
+                top_msg_id=topic_id
+            ))
+        else:
+            await client.forward_messages(entity, source_msg_id, from_peer=source_chat)
+        return
+
+    await client.forward_messages(entity, msg_to_send)
+
 async def process_task_for_account(task, account, bot_client):
     """Executes forwarding for a single account and a single task."""
     user_id = task['user_id']
@@ -78,6 +99,7 @@ async def process_task_for_account(task, account, bot_client):
         source_chat = task['source_chat_id']
         source_msg_id = task['source_msg_id']
         source_text = task['source_text']
+        can_forward_from_source = bool(source_chat and source_msg_id and int(source_chat) != int(user_id))
         
         msg_to_send = None
         if source_chat and source_msg_id:
@@ -87,10 +109,10 @@ async def process_task_for_account(task, account, bot_client):
                 logger.warning(f"Account {phone} could not fetch source message {source_msg_id} from {source_chat}: {e}")
         
         # Fallback to text if message not found
-        if not msg_to_send and source_text:
+        if not msg_to_send and source_text and not can_forward_from_source:
             msg_to_send = source_text
             
-        if not msg_to_send:
+        if not msg_to_send and not can_forward_from_source:
             logger.error(f"Task {task_id} source message is not available.")
             await bot_client.send_message(
                 user_id,
@@ -156,13 +178,9 @@ async def process_task_for_account(task, account, bot_client):
                     if topics:
                         for topic in topics:
                             try:
-                                # Copy send to topic (looks like a fresh message)
-                                if isinstance(msg_to_send, str):
-                                    await client.send_message(entity, msg_to_send, reply_to=topic['id'])
-                                else:
-                                    await client.send_message(entity, msg_to_send, reply_to=topic['id'])
+                                await deliver_message(client, entity, msg_to_send, source_chat, source_msg_id, topic['id'])
                                 success_count += 1
-                                logger.debug(f"Sent message to topic '{topic['title']}' in '{chat_name}'")
+                                logger.debug(f"Forwarded message to topic '{topic['title']}' in '{chat_name}'")
                                 await asyncio.sleep(config.FORWARD_DELAY)
                             except FloodWaitError as e:
                                 logger.warning(f"Flood wait inside topic group: {e}")
@@ -172,7 +190,7 @@ async def process_task_for_account(task, account, bot_client):
                                     await asyncio.sleep(e.seconds)
                                     # retry once
                                     try:
-                                        await client.send_message(entity, msg_to_send, reply_to=topic['id'])
+                                        await deliver_message(client, entity, msg_to_send, source_chat, source_msg_id, topic['id'])
                                         success_count += 1
                                     except Exception:
                                         fail_count += 1
@@ -183,20 +201,14 @@ async def process_task_for_account(task, account, bot_client):
                                 logger.debug(f"Failed topic send: {e}")
                     else:
                         # Fallback: send to General (no topic ID)
-                        if isinstance(msg_to_send, str):
-                            await client.send_message(entity, msg_to_send)
-                        else:
-                            await client.send_message(entity, msg_to_send)
+                        await deliver_message(client, entity, msg_to_send, source_chat, source_msg_id)
                         success_count += 1
                         await asyncio.sleep(config.FORWARD_DELAY)
                 else:
                     # Normal DM, Group, or Channel
-                    if isinstance(msg_to_send, str):
-                        await client.send_message(entity, msg_to_send)
-                    else:
-                        await client.send_message(entity, msg_to_send)
+                    await deliver_message(client, entity, msg_to_send, source_chat, source_msg_id)
                     success_count += 1
-                    logger.debug(f"Sent message to {chat_type} '{chat_name}'")
+                    logger.debug(f"Forwarded message to {chat_type} '{chat_name}'")
                     await asyncio.sleep(config.FORWARD_DELAY)
                     
             except FloodWaitError as e:
@@ -206,10 +218,7 @@ async def process_task_for_account(task, account, bot_client):
                     await asyncio.sleep(e.seconds)
                     # retry
                     try:
-                        if isinstance(msg_to_send, str):
-                            await client.send_message(entity, msg_to_send)
-                        else:
-                            await client.send_message(entity, msg_to_send)
+                        await deliver_message(client, entity, msg_to_send, source_chat, source_msg_id)
                         success_count += 1
                     except Exception:
                         fail_count += 1
