@@ -2,9 +2,12 @@ import logging
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 from telethon.errors import (
+    FloodWaitError,
     SessionPasswordNeededError, 
     PhoneCodeInvalidError, 
     PhoneCodeExpiredError,
+    PhoneNumberFloodError,
+    PhoneNumberInvalidError,
     PasswordHashInvalidError
 )
 import database
@@ -18,25 +21,42 @@ _login_sessions = {}
 def get_login_session(user_id: int):
     return _login_sessions.get(user_id)
 
-def clear_login_session(user_id: int):
+async def clear_login_session(user_id: int):
     if user_id in _login_sessions:
         # Disconnect client if connected
         client = _login_sessions[user_id].get('client')
         if client:
             try:
-                import asyncio
-                asyncio.create_task(client.disconnect())
+                await client.disconnect()
             except Exception:
                 pass
         del _login_sessions[user_id]
 
-async def start_login(user_id: int, phone: str) -> str:
+def describe_code_delivery(sent_code) -> str:
+    """Build a short user-facing hint about where Telegram sent the login code."""
+    code_type = getattr(sent_code, 'type', None)
+    type_name = type(code_type).__name__
+
+    if 'SentCodeTypeApp' in type_name:
+        return "Telegram sent the code inside your Telegram app/session, not as an SMS."
+    if 'SentCodeTypeSms' in type_name:
+        return "Telegram sent the code by SMS."
+    if 'SentCodeTypeCall' in type_name:
+        return "Telegram will provide the code by phone call."
+    if 'SentCodeTypeFlashCall' in type_name:
+        return "Telegram will provide the code by flash call."
+    if 'SentCodeTypeFragmentSms' in type_name:
+        return "Telegram sent the code through Fragment SMS."
+
+    return "Check your Telegram app first; Telegram often sends login codes there instead of SMS."
+
+async def start_login(user_id: int, phone: str):
     """
     Starts the login process by sending a code request.
     Returns "code_sent" on success, or raises exception.
     """
     # Clean up any existing attempt
-    clear_login_session(user_id)
+    await clear_login_session(user_id)
     
     # Create Telethon client with StringSession
     session = StringSession()
@@ -50,10 +70,26 @@ async def start_login(user_id: int, phone: str) -> str:
             'client': client,
             'phone': phone,
             'phone_code_hash': sent_code.phone_code_hash,
-            'step': 'wait_code'
+            'step': 'wait_code',
+            'delivery_hint': describe_code_delivery(sent_code)
         }
-        logger.info(f"OTP code request sent to {phone} for user {user_id}")
-        return "code_sent"
+        logger.info(
+            f"OTP code request sent to {phone} for user {user_id}; "
+            f"type={type(getattr(sent_code, 'type', None)).__name__}"
+        )
+        return {"status": "code_sent", "delivery_hint": describe_code_delivery(sent_code)}
+    except PhoneNumberInvalidError:
+        await client.disconnect()
+        logger.error(f"Invalid phone number for login: {phone}")
+        raise ValueError("Telegram says this phone number is invalid. Use international format, for example +1234567890.")
+    except PhoneNumberFloodError:
+        await client.disconnect()
+        logger.error(f"Phone number flood while sending code to {phone}")
+        raise RuntimeError("Telegram is temporarily blocking new code requests for this phone number. Please wait before trying again.")
+    except FloodWaitError as e:
+        await client.disconnect()
+        logger.error(f"Flood wait while sending code to {phone}: {e.seconds}s")
+        raise RuntimeError(f"Telegram rate-limited this login request. Try again after {e.seconds} seconds.")
     except Exception as e:
         await client.disconnect()
         logger.error(f"Failed to send code to {phone}: {e}")
